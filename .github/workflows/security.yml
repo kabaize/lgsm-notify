@@ -1,0 +1,49 @@
+name: security
+
+on:
+  push:
+  pull_request:
+  schedule:
+    - cron: "0 6 * * 1"
+
+permissions:
+  contents: read
+  security-events: write
+
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # gitleaks needs full history
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: tests
+        run: |
+          pip install -r requirements.txt -r requirements-dev.txt
+          pytest
+
+      - name: semgrep
+        run: semgrep scan --config .semgrep/ --error --metrics=off .
+
+      - name: gitleaks
+        # --redact keeps any finding out of the public CI log.
+        run: |
+          docker run --rm -v "$PWD:/repo" zricethezav/gitleaks:latest \
+            detect --source /repo --redact -v
+
+      - name: trivy fs
+        uses: aquasecurity/trivy-action@0.28.0 # pin; do not use @master
+        with:
+          scan-type: fs
+          scanners: vuln,secret,misconfig
+          format: sarif
+          output: trivy.sarif
+
+      - uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: trivy.sarif

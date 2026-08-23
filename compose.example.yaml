@@ -1,0 +1,30 @@
+services:
+  lgsm-notify:
+    build: .
+    container_name: lgsm-notify
+    user: "1000:1000"
+    read_only: true
+    cap_drop: [ALL]
+    security_opt:
+      - no-new-privileges:true
+    tmpfs:
+      - /tmp
+    environment:
+      - TZ=${TZ:-UTC}
+    volumes:
+      # The LGSM console log directory, read-only. This is the only coupling
+      # between this container and the game server: no network path, no Docker
+      # socket, no exec, no API.
+      - ${LGSM_LOG_DIR:?set LGSM_LOG_DIR in .env}:/logs:ro
+      - lgsm-notify-state:/state
+    secrets:
+      - discord_webhook
+    restart: unless-stopped
+
+volumes:
+  lgsm-notify-state:
+
+secrets:
+  discord_webhook:
+    # chmod 600. Never commit this file. See .gitignore.
+    file: ./secrets/discord_webhook.txt

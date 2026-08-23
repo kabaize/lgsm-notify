@@ -1,0 +1,48 @@
+rules:
+  - id: webhook-url-in-log-sink
+    message: >
+      A credential-bearing value reaches a log sink. The Discord webhook token
+      is a URL path segment, so printing the URL discloses it. Log
+      urlparse(url).hostname, or the WebhookURL wrapper, which renders as a
+      placeholder.
+    severity: ERROR
+    languages: [python]
+    patterns:
+      - pattern-either:
+          - pattern: print(..., $X, ...)
+          - patterns:
+              # A generic logger call. $LEVEL is constrained so that ordinary
+              # method calls such as requests.get(...) do not match.
+              - pattern: $LOG.$LEVEL(..., $X, ...)
+              - metavariable-regex:
+                  metavariable: $LEVEL
+                  regex: ^(debug|info|warning|warn|error|exception|critical|log)$
+      - metavariable-pattern:
+          metavariable: $X
+          patterns:
+            - pattern-either:
+                - pattern: $W.expose()
+                - pattern: str($EXC)
+                - pattern: $RESP.url
+
+  - id: requests-raise-for-status
+    message: >
+      raise_for_status() embeds the full request URL in the exception message,
+      which discloses the webhook token on any non-2xx response. Check
+      status_code explicitly instead.
+    severity: ERROR
+    languages: [python]
+    pattern: $R.raise_for_status()
+
+  - id: requests-without-timeout
+    message: >
+      requests call without an explicit timeout. A hung connection blocks the
+      watch loop indefinitely, so join codes stop being posted.
+    severity: WARNING
+    languages: [python]
+    patterns:
+      - pattern-either:
+          - pattern: requests.get(...)
+          - pattern: requests.post(...)
+      - pattern-not: requests.get(..., timeout=$T, ...)
+      - pattern-not: requests.post(..., timeout=$T, ...)
