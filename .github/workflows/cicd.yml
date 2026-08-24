@@ -137,7 +137,7 @@ jobs:
           scanners: "vuln"
           severity: "CRITICAL,HIGH"
           format: "sarif"
-          output: "trivy-api-results.sarif"
+          output: "trivy-results.sarif"
           exit-code: ${{ env.TRIVY_EXIT_CODE }}
           ignore-unfixed: true
           vuln-type: "os,library"
