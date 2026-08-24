@@ -79,7 +79,7 @@ jobs:
         uses: docker/build-push-action@v7
         with:
           context: .
-          file: ./lgsm-notify/Dockerfile
+          file: ./Dockerfile
           push: false
           tags: ${{ env.IMAGE }}:ci
           load: true
