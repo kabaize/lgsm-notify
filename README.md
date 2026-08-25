@@ -62,13 +62,13 @@ is generated and there is nothing to match.
 
 ## Configuration
 
-| Variable | Default | Purpose |
-|---|---|---|
-| `LGSM_LOG_DIR` | none, required | Host path to the LGSM console log directory |
-| `LOG_DIR` | `/logs` | Mount point inside the container |
-| `STATE_FILE` | `/state/last.json` | Last-posted code, on a named volume |
-| `WEBHOOK_FILE` | `/run/secrets/discord_webhook` | Path to the webhook secret |
-| `TZ` | `UTC` | Affects container-local timestamps only |
+| Variable       | Default                        | Purpose                                     |
+| -------------- | ------------------------------ | ------------------------------------------- |
+| `LGSM_LOG_DIR` | none, required                 | Host path to the LGSM console log directory |
+| `LOG_DIR`      | `/logs`                        | Mount point inside the container            |
+| `STATE_FILE`   | `/state/last.json`             | Last-posted code, on a named volume         |
+| `WEBHOOK_FILE` | `/run/secrets/discord_webhook` | Path to the webhook secret                  |
+| `TZ`           | `UTC`                          | Affects container-local timestamps only     |
 
 `WEBHOOK_FILE` is a **path**, not a URL. The webhook itself is never passed as
 an environment variable; see [Threat model](#threat-model).
@@ -77,7 +77,7 @@ an environment variable; see [Threat model](#threat-model).
 
 Two classes of secret pass through this program:
 
-1. **The Discord webhook token.** It is a URL *path segment*, not a header. Any
+1. **The Discord webhook token.** It is a URL _path segment_, not a header. Any
    code that prints the URL discloses a write credential for the channel.
 2. **The join code.** It grants access to the game server for as long as the
    session lives.
@@ -97,7 +97,7 @@ and `__format__` all render `<webhook redacted>`. An f-string, a `%s`, a
 only via `.expose()`, which is deliberately greppable:
 
 ```bash
-grep -n 'expose()' notify.py   # exactly 2 hits, both requests calls
+grep -n 'expose()' notify.py   # Every hit should be a requests call
 ```
 
 Same idea as Rust's `secrecy::Secret` and Pydantic's `SecretStr`.
@@ -105,7 +105,7 @@ Same idea as Rust's `secrecy::Secret` and Pydantic's `SecretStr`.
 **`raise_for_status()` and `print(exc)` are banned.** `requests` embeds the full
 request URL in its exception messages, which is precisely how the token would
 escape. Failures log the HTTP status code and the exception class name, never
-the URL. A Semgrep rule in `.semgrep/` fails CI if either pattern returns.
+the URL. A Semgrep rule in `.semgrep/` fails CI if any of these patterns return.
 
 **The webhook is delivered as a file secret, not an environment variable.**
 Environment variables are copied into container config on disk
@@ -120,7 +120,7 @@ is built from.
 **The URL is validated on load**, not merely prefix-checked: scheme must be
 `https`, host must be a known Discord host, path must begin with
 `/api/webhooks/`. This stops a typo or a hostile config file from redirecting
-posts to an arbitrary endpoint. Failures name the rejected *hostname* only.
+posts to an arbitrary endpoint. Failures name the rejected _hostname_ only.
 
 **Startup preflight.** A wrong-but-live URL that returns 2xx on `POST` would
 otherwise cause the program to mark codes as delivered and persist state for
@@ -141,8 +141,8 @@ route to the game server network.
 - A file switch discards any unread tail; a `drain()` before close is planned.
 - The whole file is read from byte 0. Fine for a single-session log, fragile if
   LGSM log configuration changes.
-- The base image (`python:3.12-slim`) is pinned by tag, not digest. A tag can
-  be repointed upstream without notice; digest-pinning (`FROM python:3.12-slim@sha256:...`)
+- The Python base image is pinned by tag, not digest. A tag can
+  be repointed upstream without notice. Digest-pinning
   is the stronger supply-chain guarantee and is planned.
 - `requirements.txt` pins exact versions but not hashes. `pip install --require-hashes`
   would catch a compromised package mirror serving a tampered artifact under
@@ -154,11 +154,12 @@ route to the game server network.
 ```bash
 pip install -r requirements.txt -r requirements-dev.txt
 pytest
-pip install semgrep && semgrep --config .semgrep/ --error .
-docker run --rm -v "$PWD:/repo" zricethezav/gitleaks:latest detect --source /repo --no-git -v
+pip install semgrep && semgrep scan --config .semgrep/ --error --metrics=off .
+docker run --rm -v "$PWD:/repo" zricethezav/gitleaks:latest detect --source /repo --redact -v
+docker run --rm -v "$PWD:/repo" aquasec/trivy:latest fs --scanners vuln,secret,misconfig /repo
 ```
 
-All four run in CI on every push. See `.github/workflows/security.yml`.
+All four run in CI on every push-to-main, PRs into main/develop, workflow_dispatch, or cron schedule. See `.github/workflows/cicd.yml`.
 
 ### Never commit
 
